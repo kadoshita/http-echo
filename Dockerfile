@@ -13,7 +13,7 @@ ARG BIN_NAME=http-echo
 WORKDIR /app
 
 # Copy go mod and sum files
-COPY go.mod go.sum ./
+COPY go.mod ./
 
 # Download dependencies
 RUN go mod download
