@@ -74,7 +74,7 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - uses: hashicorp/actions-go-build@v0.1.7
+      - uses: hashicorp/actions-go-build@b9e2cfba3013adccdc112b01cba922d83c78fac5 # v1.1.1
         env:
           BASE_VERSION: ${{ needs.set-product-version.outputs.product-base-version }}
           PRERELEASE_VERSION: ${{ needs.set-product-version.outputs.product-prerelease-version}}
@@ -107,7 +107,7 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - uses: hashicorp/actions-go-build@v0.1.7
+      - uses: hashicorp/actions-go-build@b9e2cfba3013adccdc112b01cba922d83c78fac5 # v1.1.1
         env:
           BASE_VERSION: ${{ needs.set-product-version.outputs.product-base-version }}
           PRERELEASE_VERSION: ${{ needs.set-product-version.outputs.product-prerelease-version}}
@@ -143,7 +143,7 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - uses: hashicorp/actions-go-build@v0.1.7
+      - uses: hashicorp/actions-go-build@b9e2cfba3013adccdc112b01cba922d83c78fac5 # v1.1.1
         env:
           BASE_VERSION: ${{ needs.set-product-version.outputs.product-base-version }}
           PRERELEASE_VERSION: ${{ needs.set-product-version.outputs.product-prerelease-version}}
