@@ -4,8 +4,7 @@
 package main
 
 import (
-	"fmt"
-	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -15,9 +14,6 @@ import (
 const (
 	httpHeaderAppName    string = "X-App-Name"
 	httpHeaderAppVersion string = "X-App-Version"
-
-	httpLogDateFormat string = "2006/01/02 15:04:05"
-	httpLogFormat     string = "%v %s %s \"%s %s %s\" %d %d \"%s\" %v\n"
 )
 
 // withAppHeaders adds application headers such as X-App-Version and X-App-Name.
@@ -58,9 +54,8 @@ func (w *metaResponseWriter) Write(b []byte) (int, error) {
 	return w.writer.Write(b)
 }
 
-// httpLog accepts an io object and logs the request and response objects to the
-// given io.Writer.
-func httpLog(out io.Writer, h http.HandlerFunc) http.HandlerFunc {
+// httpLog logs the request and response objects using structured logging.
+func httpLog(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var mrw metaResponseWriter
 		mrw.writer = w
@@ -70,10 +65,23 @@ func httpLog(out io.Writer, h http.HandlerFunc) http.HandlerFunc {
 			length := mrw.length
 			end := time.Now()
 			dur := end.Sub(start)
-			fmt.Fprintf(out, httpLogFormat,
-				end.Format(httpLogDateFormat),
-				r.Host, r.RemoteAddr, r.Method, r.URL.Path, r.Proto,
-				status, length, r.UserAgent(), dur)
+			xForwardedFor := r.Header.Get("X-Forwarded-For")
+			if xForwardedFor == "" {
+				xForwardedFor = "-"
+			}
+
+			slog.Info("request",
+				"host", r.Host,
+				"remote_addr", r.RemoteAddr,
+				"method", r.Method,
+				"path", r.URL.Path,
+				"protocol", r.Proto,
+				"status_code", status,
+				"response_length", length,
+				"user_agent", r.UserAgent(),
+				"x_forwarded_for", xForwardedFor,
+				"duration_ms", dur.Milliseconds(),
+			)
 		}(time.Now())
 
 		h(&mrw, r)

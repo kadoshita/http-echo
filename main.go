@@ -7,7 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -22,6 +22,7 @@ var (
 	textFlag    = flag.String("text", "", "text to put on the webpage")
 	versionFlag = flag.Bool("version", false, "display version information")
 	statusFlag  = flag.Int("status-code", 200, "http response code, e.g.: 200")
+	jsonLogFlag = flag.Bool("json-log", false, "output logs in JSON format")
 
 	// stdoutW and stderrW are for overriding in test.
 	stdoutW = os.Stdout
@@ -30,6 +31,20 @@ var (
 
 func main() {
 	flag.Parse()
+
+	// Initialize structured logging
+	var handler slog.Handler
+	if *jsonLogFlag {
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		})
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		})
+	}
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
 
 	// Asking for the version?
 	if *versionFlag {
@@ -57,7 +72,7 @@ func main() {
 
 	// Flag gets printed as a page
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", httpLog(stdoutW, withAppHeaders(*statusFlag, httpEcho(echoText))))
+	mux.HandleFunc("/", httpLog(withAppHeaders(*statusFlag, httpEcho(echoText))))
 
 	// Health endpoint
 	mux.HandleFunc("/health", withAppHeaders(200, httpHealth()))
@@ -68,9 +83,10 @@ func main() {
 	}
 	serverCh := make(chan struct{})
 	go func() {
-		log.Printf("[INFO] server is listening on %s\n", *listenFlag)
+		slog.Info("server is listening", "address", *listenFlag)
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("[ERR] server exited with: %s", err)
+			slog.Error("server exited", "error", err)
+			os.Exit(1)
 		}
 		close(serverCh)
 	}()
@@ -81,12 +97,13 @@ func main() {
 	// Wait for interrupt
 	<-signalCh
 
-	log.Printf("[INFO] received interrupt, shutting down...")
+	slog.Info("received interrupt, shutting down...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("[ERR] failed to shutdown server: %s", err)
+		slog.Error("failed to shutdown server", "error", err)
+		os.Exit(1)
 	}
 
 	// If we got this far, it was an interrupt, so don't exit cleanly
