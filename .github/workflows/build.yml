@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set Product version
         id: set-product-version
-        uses: hashicorp/actions-set-product-version@v1
+        uses: hashicorp/actions-set-product-version@e2c49d61aff17b1280ddfe7bb031331d02ca0140 # v1.0.1
 
   generate-metadata-file:
     needs: set-product-version
@@ -47,7 +47,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Generate metadata file
         id: generate-metadata-file
-        uses: hashicorp/actions-generate-metadata@v1
+        uses: hashicorp/actions-generate-metadata@f1d852525201cb7bbbf031dd2e985fb4c22307fc # v1.1.3
         with:
           version: ${{ needs.set-product-version.outputs.product-version }}
           product: ${{ env.PKG_NAME }}
@@ -159,28 +159,41 @@ jobs:
             cp LICENSE $TARGET_DIR/LICENSE.txt
             make build
 
-  build-docker-default:
-    name: Docker ${{ matrix.arch }} default release build
+  build-docker:
+    name: Docker ${{ matrix.platform }} build
     needs:
       - set-product-version
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        arch: ["arm64", "amd64"]
-        include:
-          - arch: "arm64"
-            platform: "linux/arm64"
-          - arch: "amd64"
-            platform: "linux/amd64"
+        platform:
+          - linux/amd64
+          - linux/arm64
     env:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.set-product-version.outputs.product-version }}
+      registry_image: ghcr.io/${{ github.repository }}
     permissions:
       contents: read
       packages: write
 
     steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
+        with:
+          images: ${{ env.registry_image }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
@@ -192,34 +205,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=${{ env.version }}
-            type=raw,value=latest
-            type=raw,value=${{ env.version }}-dev,enable={{is_default_branch}}
-            type=raw,value=${{ env.version }}-${{ github.sha }},enable={{is_default_branch}}
-            type=raw,value=dev,enable={{is_default_branch}}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.registry_image }}
           build-args: |
             PRODUCT_VERSION=${{ env.version }}
             BIN_NAME=http-echo
           target: default
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Test Docker image
         run: |
-          TEST_VERSION="$(docker run --rm ghcr.io/${{ github.repository }}:${{ env.version }} -version | awk '/http-echo/{print $2}' | sed s/v//)"
+          TEST_VERSION="$(docker run --rm ${{ env.registry_image }}@${{ steps.build.outputs.digest }} -version | awk '/http-echo/{print $2}' | sed s/v//)"
           if [ "${TEST_VERSION}" != "${{ env.version }}" ]; then
             echo "Test FAILED"
             echo "Test Version: ${TEST_VERSION}"
@@ -227,3 +235,64 @@ jobs:
             exit 1
           fi
           echo "Test PASSED"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge-docker:
+    name: Merge Docker manifests
+    runs-on: ubuntu-latest
+    needs:
+      - set-product-version
+      - build-docker
+    env:
+      version: ${{ needs.set-product-version.outputs.product-version }}
+      registry_image: ghcr.io/${{ github.repository }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
+        with:
+          images: ${{ env.registry_image }}
+          tags: |
+            type=raw,value=${{ env.version }}
+            type=raw,value=latest
+            type=raw,value=${{ env.version }}-dev,enable={{is_default_branch}}
+            type=raw,value=${{ env.version }}-${{ github.sha }},enable={{is_default_branch}}
+            type=raw,value=dev,enable={{is_default_branch}}
+
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.registry_image }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.registry_image }}:${{ steps.meta.outputs.version }}
