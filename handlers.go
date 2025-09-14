@@ -69,8 +69,14 @@ func httpLog(h http.HandlerFunc) http.HandlerFunc {
 			if xForwardedFor == "" {
 				xForwardedFor = "-"
 			}
+			xRealIP := r.Header.Get("X-Real-IP")
+			if xRealIP == "" {
+				xRealIP = "-"
+			}
 
 			slog.Info("request",
+				"x_forwarded_for", xForwardedFor,
+				"x_real_ip", xRealIP,
 				"host", r.Host,
 				"remote_addr", r.RemoteAddr,
 				"method", r.Method,
@@ -79,7 +85,6 @@ func httpLog(h http.HandlerFunc) http.HandlerFunc {
 				"status_code", status,
 				"response_length", length,
 				"user_agent", r.UserAgent(),
-				"x_forwarded_for", xForwardedFor,
 				"duration_ms", dur.Milliseconds(),
 			)
 		}(time.Now())
