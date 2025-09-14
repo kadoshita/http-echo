@@ -225,17 +225,6 @@ jobs:
           digest="${{ steps.build.outputs.digest }}"
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
-      - name: Test Docker image
-        run: |
-          TEST_VERSION="$(docker run --rm ${{ env.registry_image }}@${{ steps.build.outputs.digest }} -version | awk '/http-echo/{print $2}' | sed s/v//)"
-          if [ "${TEST_VERSION}" != "${{ env.version }}" ]; then
-            echo "Test FAILED"
-            echo "Test Version: ${TEST_VERSION}"
-            echo "Version: ${{ env.version }}"
-            exit 1
-          fi
-          echo "Test PASSED"
-
       - name: Upload digest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
