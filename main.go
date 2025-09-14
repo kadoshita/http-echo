@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashicorp/http-echo/version"
+	"github.com/kadoshita/http-echo/version"
 )
 
 var (

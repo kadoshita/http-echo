@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hashicorp/http-echo/version"
+	"github.com/kadoshita/http-echo/version"
 )
 
 const (
