@@ -40,7 +40,7 @@ bob trigger-promotion \
 
 ## Edit the GH Release
 
-Manually edit the [new release page in GitHub](https://github.com/hashicorp/http-echo/releases/latest) to point to the release artifacts:
+Manually edit the [new release page in GitHub](https://github.com/kadoshita/http-echo/releases/latest) to point to the release artifacts:
 
 ```
 [Binaries can be downloaded here](https://releases.hashicorp.com/http-echo/${insert your version here}/).

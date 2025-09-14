@@ -41,9 +41,9 @@ XC_EXCLUDE ?=
 LD_FLAGS ?= \
 	-s \
 	-w \
-	-X 'github.com/hashicorp/http-echo/version.Version=${VERSION}' \
-	-X 'github.com/hashicorp/http-echo/version.GitCommit=${REVISION}' \
-	-X 'github.com/hashicorp/http-echo/version.Timestamp=${TIMESTAMP}'
+	-X 'github.com/kadoshita/http-echo/version.Version=${VERSION}' \
+	-X 'github.com/kadoshita/http-echo/version.GitCommit=${REVISION}' \
+	-X 'github.com/kadoshita/http-echo/version.Timestamp=${TIMESTAMP}'
 
 # List of tests to run
 TEST ?= ./...
@@ -56,7 +56,7 @@ version:
 dist:
 	mkdir -p $(DIST)
 
-# build is used for the CRT build.yml workflow. 
+# build is used for the CRT build.yml workflow.
 # Environment variables are populated by hashicorp/actions-go-build, not the makefile.
 # https://github.com/hashicorp/actions-go-build
 build:
@@ -64,13 +64,13 @@ build:
 		-a \
 		-o="${BIN_PATH}" \
 		-ldflags " \
-			-X 'github.com/hashicorp/http-echo/version.Version=${PRODUCT_VERSION}' \
-			-X 'github.com/hashicorp/http-echo/version.GitCommit=${PRODUCT_REVISION}' \
-			-X 'github.com/hashicorp/http-echo/version.Timestamp=${PRODUCT_REVISION_TIME}' \
+			-X 'github.com/kadoshita/http-echo/version.Version=${PRODUCT_VERSION}' \
+			-X 'github.com/kadoshita/http-echo/version.GitCommit=${PRODUCT_REVISION}' \
+			-X 'github.com/kadoshita/http-echo/version.Timestamp=${PRODUCT_REVISION_TIME}' \
 		" \
 		-tags "${GOTAGS}" \
 		-trimpath \
-		-buildvcs=false 
+		-buildvcs=false
 .PHONY: build
 
 bin: dist
@@ -115,4 +115,3 @@ clean:
 	@rm -rf "${CURRENT_DIR}/pkg/"
 	@rm -rf "${CURRENT_DIR}/bin/"
 .PHONY: clean
-
